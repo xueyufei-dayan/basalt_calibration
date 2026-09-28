@@ -159,7 +159,9 @@ class EurocIO : public DatasetIoInterface {
 
     data.reset(new EurocVioDataset);
 
-    data->num_cams = 2;
+    // EuRoC is commonly stereo, but calibration datasets can be monocular.
+    // Infer the number of image streams from the optional cam1 metadata file.
+    data->num_cams = fs::exists(path + "/mav0/cam1/data.csv") ? 2 : 1;
     data->path = path;
 
     read_image_timestamps(path + "/mav0/cam0/");

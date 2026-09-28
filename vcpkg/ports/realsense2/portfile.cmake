@@ -9,6 +9,22 @@ vcpkg_from_github(
         fix_macos_arm64_flags.patch
 )
 
+# GCC 13 rejects the curly quotes (U+2018/U+2019) that librealsense embeds
+# in the #if 0 block of src/libusb/libusb.h (and in bundled glfw sources).
+# Replace them with ASCII quotes so the port compiles with modern toolchains.
+foreach(_rs_fix_file
+    "${SOURCE_PATH}/src/libusb/libusb.h"
+    "${SOURCE_PATH}/third-party/glfw/deps/tinycthread.h"
+    "${SOURCE_PATH}/third-party/glfw/src/wl_window.c"
+    "${SOURCE_PATH}/third-party/glfw/src/wl_init.c")
+  if(EXISTS "${_rs_fix_file}")
+    file(READ "${_rs_fix_file}" _rs_fix_content)
+    string(REPLACE "‘" "'" _rs_fix_content "${_rs_fix_content}")
+    string(REPLACE "’" "'" _rs_fix_content "${_rs_fix_content}")
+    file(WRITE "${_rs_fix_file}" "${_rs_fix_content}")
+  endif()
+endforeach()
+
 file(COPY "${SOURCE_PATH}/src/win7/drivers/IntelRealSense_D400_series_win7.inf" DESTINATION "${SOURCE_PATH}")
 string(COMPARE EQUAL "${VCPKG_CRT_LINKAGE}" "static" BUILD_CRT_LINKAGE)
 

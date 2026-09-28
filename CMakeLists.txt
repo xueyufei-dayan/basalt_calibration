@@ -169,7 +169,7 @@ set(CMAKE_CXX_FLAGS "${BASALT_CXX_FLAGS} ${BASALT_MARCH_FLAGS} ${BASALT_PASSED_C
 
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(TBB CONFIG REQUIRED)
-find_package(OpenCV CONFIG REQUIRED COMPONENTS core imgproc calib3d features2d imgcodecs)
+find_package(OpenCV CONFIG REQUIRED COMPONENTS core imgproc calib3d features2d imgcodecs videoio)
 file(GLOB BASALT_VCPKG_BOOST_CONFIG "${CMAKE_BINARY_DIR}/vcpkg_installed/*/share/boost/BoostConfig.cmake")
 if(BASALT_VCPKG_BOOST_CONFIG)
   list(GET BASALT_VCPKG_BOOST_CONFIG 0 BASALT_VCPKG_BOOST_CONFIG)
@@ -270,6 +270,7 @@ target_sources(basalt
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/hash_bow/hash_bow.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_euroc.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_gopro.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_kitti.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_rosbag.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/io/dataset_io_uzh.h
@@ -355,6 +356,14 @@ target_include_directories(basalt PUBLIC
 target_compile_definitions(basalt PUBLIC ${BASALT_COMPILE_DEFINITIONS})
 #target_compile_definitions(basalt PUBLIC BASALT_DISABLE_ASSERTS)
 
+# OpenCV's videoio pulls in vcpkg's static FFmpeg, whose assembly objects
+# (e.g. vc1dsp_mmx.o) use R_X86_64_PC32 relocations against global symbols and
+# therefore cannot be linked into a shared object. Hiding the symbols that come
+# from static archives makes those relocations local, which the linker accepts.
+if(BASALT_BUILD_SHARED_LIB AND UNIX AND NOT APPLE)
+  target_link_options(basalt PRIVATE "LINKER:--exclude-libs,ALL")
+endif()
+
 add_executable(basalt_calibrate src/calibrate.cpp src/calibration/cam_calib.cpp)
 target_link_libraries(basalt_calibrate basalt ${BASALT_PANGO_TARGETS} basalt::cli11)
 basalt_add_gui_link_options(basalt_calibrate)
@@ -428,6 +437,11 @@ if(realsense2_FOUND)
     find_library(UDEV_LIB udev REQUIRED)
     target_link_libraries(basalt_rs_t265_record "${UDEV_LIB}")
     target_link_libraries(basalt_rs_t265_vio "${UDEV_LIB}")
+    # The static libusb archive (from realsense2) needs udev symbols, but with
+    # --as-needed the linker drops libudev when it appears before libusb on
+    # the link line. Force it to stay in the link.
+    target_link_options(basalt_rs_t265_record PRIVATE "LINKER:--no-as-needed")
+    target_link_options(basalt_rs_t265_vio PRIVATE "LINKER:--no-as-needed")
     target_link_options(basalt_rs_t265_record PRIVATE "LINKER:--allow-multiple-definition")
     target_link_options(basalt_rs_t265_vio PRIVATE "LINKER:--allow-multiple-definition")
   elseif(APPLE)

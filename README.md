@@ -58,6 +58,33 @@ ctest --preset relwithdebinfo
 By default presets use:
 `thirdparty/vcpkg/scripts/buildsystems/vcpkg.cmake`
 
+### Linking against static FFmpeg (Linux)
+OpenCV is configured with the `ffmpeg` feature (`vcpkg.json`), so the static
+FFmpeg archives (`libavcodec.a` and friends) end up on the link line of
+`libbasalt.so`. Some of their hand-written assembly objects are not PIC, and
+linking them into a shared object fails with:
+```
+/usr/bin/ld: vcpkg_installed/x64-linux/lib/libavcodec.a(vc1dsp_mmx.o):
+  relocation R_X86_64_PC32 against symbol `ff_pw_9' can not be used when making a shared object
+/usr/bin/ld: final link failed: bad value
+```
+
+`CMakeLists.txt` handles this for the `basalt` shared library by hiding all
+symbols that come from static archives, which turns those relocations into
+local ones the linker accepts:
+```cmake
+if(BASALT_BUILD_SHARED_LIB AND UNIX AND NOT APPLE)
+  target_link_options(basalt PRIVATE "LINKER:--exclude-libs,ALL")
+endif()
+```
+
+The flag is skipped when `BASALT_BUILD_SHARED_LIB=OFF`, i.e. when `basalt` is
+built as a static library that is later linked into executables.
+
+### Verified build environment
+Confirmed to build and pass `ctest` (18/18) on Linux x86-64 with GCC 13.3,
+CMake 3.28.3, Ninja 1.13 and the `relwithdebinfo` preset (vcpkg 2026-03-04).
+
 On macOS, build the release preset and then package the release artifact:
 ```
 cmake --preset release

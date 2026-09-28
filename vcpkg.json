@@ -25,6 +25,7 @@
       "default-features": false,
       "features": [
         "calib3d",
+        "ffmpeg",
         "jpeg",
         "png",
         "webp"
